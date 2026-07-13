@@ -13,6 +13,13 @@ function context() {
     return SillyTavern.getContext();
 }
 
+function getCurrentCharacterId() {
+    const { characterId } = context();
+    if (typeof characterId !== 'number' && typeof characterId !== 'string') return null;
+    const id = Number(characterId);
+    return Number.isInteger(id) ? id : null;
+}
+
 function getSettings() {
     const { extensionSettings } = context();
     extensionSettings[MODULE_NAME] ??= structuredClone(DEFAULT_SETTINGS);
@@ -70,14 +77,16 @@ function placeText(value, mode) {
 }
 
 function ensureBar() {
-    if (barElement?.isConnected) return barElement;
-    const sendForm = document.querySelector('#send_form');
-    if (!sendForm?.parentElement) return null;
+    const nativeBar = document.querySelector('#qr--bar');
+    if (!nativeBar) return null;
+    if (barElement?.isConnected && barElement.parentElement === nativeBar) return barElement;
 
+    barElement?.remove();
     barElement = document.createElement('div');
-    barElement.id = 'quikinput-bar';
-    barElement.setAttribute('aria-label', 'Character Quick Input');
-    sendForm.parentElement.insertBefore(barElement, sendForm);
+    barElement.id = 'quikinput-buttons';
+    barElement.className = 'qr--buttons quikinput-buttons';
+    barElement.setAttribute('aria-label', '角色名快捷输入');
+    nativeBar.append(barElement);
     return barElement;
 }
 
@@ -86,26 +95,35 @@ function renderBar() {
     if (!bar) return;
     bar.replaceChildren();
 
-    const { characterId } = context();
+    const characterId = getCurrentCharacterId();
     const settings = getSettings();
-    if (!settings.enabled || !Number.isInteger(characterId)) {
-        bar.hidden = true;
+    if (!settings.enabled || characterId === null) {
+        bar.remove();
+        barElement = null;
         return;
     }
 
     const config = getCharacterConfig(characterId);
     if (config.buttons.length === 0) {
-        bar.hidden = true;
+        bar.remove();
+        barElement = null;
         return;
     }
 
     for (const item of config.buttons) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'menu_button quikinput-button';
+        const button = document.createElement('div');
+        button.className = 'qr--button menu_button quikinput-button';
+        button.setAttribute('role', 'button');
+        button.tabIndex = 0;
         button.textContent = item.label || item.value || '未命名';
         button.title = item.value;
         button.addEventListener('click', () => placeText(item.value, item.mode));
+        button.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                placeText(item.value, item.mode);
+            }
+        });
         bar.append(button);
     }
     bar.hidden = false;
@@ -129,7 +147,7 @@ function refreshCharacterSelect() {
         select.append(makeOption(index, name));
     });
 
-    const currentId = Number.isInteger(context().characterId) ? context().characterId : null;
+    const currentId = getCurrentCharacterId();
     editorCharacterId = Number.isInteger(previous) && context().characters?.[previous]
         ? previous
         : currentId;
@@ -263,6 +281,8 @@ function refreshAll() {
     refreshCharacterSelect();
     renderEditor();
     renderBar();
+    // Quick Reply 会在切换聊天时自行重绘按钮栏，稍后再补回本扩展按钮。
+    setTimeout(renderBar, 0);
 }
 
 function initialize() {
