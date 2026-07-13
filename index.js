@@ -8,6 +8,8 @@ const DEFAULT_SETTINGS = Object.freeze({
 let editorCharacterId = null;
 let barElement = null;
 let settingsElement = null;
+let qrObserver = null;
+let qrRepairScheduled = false;
 
 function context() {
     return SillyTavern.getContext();
@@ -127,6 +129,34 @@ function renderBar() {
         bar.append(button);
     }
     bar.hidden = false;
+}
+
+function shouldShowBar() {
+    const characterId = getCurrentCharacterId();
+    return getSettings().enabled
+        && characterId !== null
+        && getCharacterConfig(characterId).buttons.length > 0;
+}
+
+function observeNativeQrBar() {
+    qrObserver?.disconnect();
+    const sendForm = document.querySelector('#send_form');
+    if (!sendForm) return;
+
+    qrObserver = new MutationObserver(() => {
+        if (!shouldShowBar() || document.querySelector('#quikinput-buttons')) return;
+        if (qrRepairScheduled) return;
+
+        qrRepairScheduled = true;
+        setTimeout(() => {
+            qrRepairScheduled = false;
+            if (shouldShowBar() && !document.querySelector('#quikinput-buttons')) {
+                barElement = null;
+                renderBar();
+            }
+        }, 0);
+    });
+    qrObserver.observe(sendForm, { childList: true, subtree: true });
 }
 
 function makeOption(value, text) {
@@ -289,6 +319,7 @@ function initialize() {
     getSettings();
     createSettings();
     refreshAll();
+    observeNativeQrBar();
 
     const { eventSource, event_types } = context();
     eventSource.on(event_types.CHAT_CHANGED, refreshAll);
