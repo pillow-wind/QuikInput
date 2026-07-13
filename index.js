@@ -1,6 +1,7 @@
 const MODULE_NAME = 'quikinput';
 const FIELD_NAME = 'quikinput';
-const QR_SET_NAME = '角色名快捷输入（QuikInput）';
+const QR_SET_NAME = '角色名快捷输入';
+const LEGACY_QR_SET_NAME = '角色名快捷输入（QuikInput）';
 
 const DEFAULT_SETTINGS = Object.freeze({ enabled: true });
 
@@ -77,6 +78,14 @@ function queueQuickReplySync(force = false) {
 async function syncQuickReplySet(force = false) {
     quickReplyApi ??= await waitForQuickReplyApi();
     if (!quickReplyApi) return;
+
+    const legacySet = quickReplyApi.getSetByName(LEGACY_QR_SET_NAME);
+    if (legacySet) {
+        if (quickReplyApi.listGlobalSets().includes(LEGACY_QR_SET_NAME)) {
+            quickReplyApi.removeGlobalSet(LEGACY_QR_SET_NAME);
+        }
+        await quickReplyApi.deleteSet(LEGACY_QR_SET_NAME);
+    }
 
     const characterId = getCurrentCharacterId();
     const enabled = getSettings().enabled;
