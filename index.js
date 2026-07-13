@@ -59,6 +59,17 @@ function insertAtCursor(value) {
     input.focus();
 }
 
+function preserveInputFocus(event) {
+    if (!event.isPrimary || event.button !== 0 || !(event.target instanceof Element)) return;
+
+    const button = event.target.closest('.qr--button');
+    if (!(button instanceof HTMLElement)) return;
+
+    const set = quickReplyApi?.getSetByName(QR_SET_NAME);
+    const isManagedButton = set?.qrList?.some(qr => qr.dom === button);
+    if (isManagedButton) event.preventDefault();
+}
+
 async function waitForQuickReplyApi() {
     for (let attempt = 0; attempt < 100; attempt++) {
         if (globalThis.quickReplyApi) return globalThis.quickReplyApi;
@@ -314,6 +325,7 @@ async function initialize() {
     getSettings();
     createSettings();
     quickReplyApi = await waitForQuickReplyApi();
+    document.addEventListener('pointerdown', preserveInputFocus, { capture: true });
     refreshAll();
 
     const { eventSource, event_types } = context();
