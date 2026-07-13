@@ -168,6 +168,12 @@ function renderEditor() {
         const row = document.createElement('div');
         row.className = 'quikinput-editor-row';
         row.dataset.index = String(index);
+        row.dataset.id = item.id;
+
+        const drag = document.createElement('div');
+        drag.className = 'drag-handle ui-sortable-handle quikinput-drag';
+        drag.title = '拖拽排序';
+        drag.textContent = '☰';
 
         const label = document.createElement('input');
         label.className = 'text_pole quikinput-label';
@@ -185,21 +191,43 @@ function renderEditor() {
         remove.title = '删除';
         remove.textContent = '×';
 
-        row.append(label, value, remove);
+        row.append(drag, label, value, remove);
         container.append(row);
     });
+
+    enableEditorSorting();
+}
+
+function readEditorRows() {
+    return [...settingsElement.querySelectorAll('.quikinput-editor-row')].map(row => ({
+        id: row.dataset.id || crypto.randomUUID(),
+        label: row.querySelector('.quikinput-label').value.trim(),
+        value: row.querySelector('.quikinput-value').value,
+    }));
 }
 
 async function saveEditorRows() {
     if (!Number.isInteger(editorCharacterId)) return;
-    const oldConfig = getCharacterConfig(editorCharacterId);
-    const rows = [...settingsElement.querySelectorAll('.quikinput-editor-row')];
-    const buttons = rows.map((row, index) => ({
-        id: oldConfig.buttons[index]?.id || crypto.randomUUID(),
-        label: row.querySelector('.quikinput-label').value.trim(),
-        value: row.querySelector('.quikinput-value').value,
-    }));
-    await saveCharacterConfig(editorCharacterId, { buttons });
+    await saveCharacterConfig(editorCharacterId, { buttons: readEditorRows() });
+}
+
+function enableEditorSorting() {
+    const container = settingsElement?.querySelector('#quikinput-editor');
+    if (!container || typeof globalThis.jQuery?.fn?.sortable !== 'function') return;
+
+    const $container = globalThis.jQuery(container);
+    if ($container.sortable('instance')) $container.sortable('destroy');
+    $container.sortable({
+        axis: 'y',
+        delay: globalThis.matchMedia?.('(pointer: coarse)')?.matches ? 750 : 50,
+        handle: '.drag-handle',
+        items: '.quikinput-editor-row',
+        placeholder: 'quikinput-sort-placeholder',
+        stop: async () => {
+            await saveEditorRows();
+            renderEditor();
+        },
+    });
 }
 
 function createSettings() {

@@ -32,17 +32,50 @@
 
 .quikinput-editor-row {
     display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) 2.5rem;
+    grid-template-columns: 2rem minmax(4.5rem, 0.6fr) minmax(7rem, 1.5fr) 2.5rem;
     gap: 0.35rem;
     align-items: center;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .quikinput-editor-row .text_pole {
     width: 100%;
     min-width: 0;
+    height: 2.5rem;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.quikinput-drag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2.5rem;
+    font-size: 1.15rem;
+    touch-action: none;
 }
 
 .quikinput-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+    margin: 0;
+    aspect-ratio: 1;
+    box-sizing: border-box;
     color: var(--SmartThemeQuoteColor);
     font-size: 1.25rem;
+}
+
+.quikinput-sort-placeholder {
+    height: 2.5rem;
+    border: 1px dashed var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    box-sizing: border-box;
 }
