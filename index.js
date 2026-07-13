@@ -23,7 +23,7 @@ function getSettings() {
 }
 
 function emptyCharacterConfig() {
-    return { enabled: true, buttons: [] };
+    return { buttons: [] };
 }
 
 function getCharacterConfig(characterId) {
@@ -32,7 +32,6 @@ function getCharacterConfig(characterId) {
     if (!stored || typeof stored !== 'object') return emptyCharacterConfig();
 
     return {
-        enabled: stored.enabled !== false,
         buttons: Array.isArray(stored.buttons)
             ? stored.buttons.map((button) => ({
                 id: String(button.id || crypto.randomUUID()),
@@ -95,7 +94,7 @@ function renderBar() {
     }
 
     const config = getCharacterConfig(characterId);
-    if (!config.enabled || config.buttons.length === 0) {
+    if (config.buttons.length === 0) {
         bar.hidden = true;
         return;
     }
@@ -139,21 +138,15 @@ function refreshCharacterSelect() {
 
 function renderEditor() {
     const container = settingsElement?.querySelector('#quikinput-editor');
-    const enabled = settingsElement?.querySelector('#quikinput-character-enabled');
-    if (!container || !(enabled instanceof HTMLInputElement)) return;
+    if (!container) return;
     container.replaceChildren();
 
     if (!Number.isInteger(editorCharacterId) || !context().characters?.[editorCharacterId]) {
-        enabled.checked = false;
-        enabled.disabled = true;
         container.textContent = '选择一张角色卡后即可添加按钮。';
         return;
     }
 
     const config = getCharacterConfig(editorCharacterId);
-    enabled.disabled = false;
-    enabled.checked = config.enabled;
-
     config.buttons.forEach((item, index) => {
         const row = document.createElement('div');
         row.className = 'quikinput-editor-row';
@@ -220,12 +213,13 @@ function createSettings() {
                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">
-                <label class="checkbox_label"><input id="quikinput-master-enabled" type="checkbox"><span>启用扩展</span></label>
-                <label for="quikinput-character">编辑角色卡</label>
+                <div class="quikinput-toolbar">
+                    <label class="checkbox_label"><input id="quikinput-master-enabled" type="checkbox"><span>启用扩展</span></label>
+                    <button id="quikinput-add" type="button" class="menu_button">＋ 添加按钮</button>
+                </div>
+                <label for="quikinput-character">选择角色</label>
                 <select id="quikinput-character" class="text_pole"></select>
-                <label class="checkbox_label"><input id="quikinput-character-enabled" type="checkbox"><span>为该角色显示快捷输入按钮</span></label>
                 <div id="quikinput-editor"></div>
-                <button id="quikinput-add" type="button" class="menu_button">＋ 添加按钮</button>
                 <small>配置保存在角色卡的 extensions.quikinput 字段中。群聊暂不显示。</small>
             </div>
         </div>`;
@@ -243,13 +237,6 @@ function createSettings() {
     wrapper.querySelector('#quikinput-character').addEventListener('change', (event) => {
         editorCharacterId = event.target.value === '' ? null : Number(event.target.value);
         renderEditor();
-    });
-
-    wrapper.querySelector('#quikinput-character-enabled').addEventListener('change', async (event) => {
-        if (!Number.isInteger(editorCharacterId)) return;
-        const config = getCharacterConfig(editorCharacterId);
-        config.enabled = event.target.checked;
-        await saveCharacterConfig(editorCharacterId, config);
     });
 
     wrapper.querySelector('#quikinput-add').addEventListener('click', async () => {
