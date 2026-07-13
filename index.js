@@ -179,7 +179,7 @@ function renderEditor() {
     container.replaceChildren();
 
     if (!Number.isInteger(editorCharacterId) || !context().characters?.[editorCharacterId]) {
-        container.textContent = '选择一张角色卡后即可添加按钮。';
+        container.textContent = '选择一张角色卡后即可添加名称。';
         return;
     }
 
@@ -270,7 +270,7 @@ function createSettings() {
             <div class="inline-drawer-content">
                 <div class="quikinput-toolbar">
                     <label class="checkbox_label"><input id="quikinput-master-enabled" type="checkbox"><span>启用扩展</span></label>
-                    <button id="quikinput-add" type="button" class="menu_button">＋ 添加按钮</button>
+                    <button id="quikinput-add" type="button" class="menu_button">＋ 添加名称</button>
                 </div>
                 <div class="quikinput-character-row">
                     <label for="quikinput-character">选择角色</label>
@@ -298,7 +298,7 @@ function createSettings() {
     wrapper.querySelector('#quikinput-add').addEventListener('click', async () => {
         if (!Number.isInteger(editorCharacterId)) return;
         const config = getCharacterConfig(editorCharacterId);
-        config.buttons.push({ id: crypto.randomUUID(), label: '新按钮', value: '' });
+        config.buttons.push({ id: crypto.randomUUID(), label: '角色名', value: '' });
         await saveCharacterConfig(editorCharacterId, config);
         renderEditor();
     });

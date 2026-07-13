@@ -25,7 +25,7 @@ https://github.com/pillow-wind/QuikInput.git
 
 1. 确保酒馆内置 Quick Reply 扩展已启用。
 2. 打开扩展面板中的“角色名快捷输入”。
-3. 选择角色并添加按钮。
+3. 选择角色并添加名称。
 4. 在 Quick Reply 管理器中启用“角色名快捷输入”包。
 5. 切换角色卡后，该 QR 包会自动显示对应角色的按钮。
 
