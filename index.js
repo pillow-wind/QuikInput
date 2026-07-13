@@ -256,7 +256,6 @@ function createSettings() {
                 <label for="quikinput-character">选择角色</label>
                 <select id="quikinput-character" class="text_pole"></select>
                 <div id="quikinput-editor"></div>
-                <small>每个角色的按钮保存在角色卡中，并同步为一个官方 QR 包；点击按钮时固定在光标处插入。</small>
             </div>
         </div>`;
     host.append(wrapper);
