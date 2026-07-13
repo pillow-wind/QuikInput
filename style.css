@@ -61,8 +61,11 @@
 .quikinput-editor-row .text_pole {
     width: 100%;
     min-width: 0;
-    height: 32px;
-    min-height: 32px;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
     margin: 0;
     box-sizing: border-box;
 }
@@ -72,7 +75,7 @@
     align-items: center;
     justify-content: center;
     width: 28px;
-    height: 32px;
+    height: 30px;
     font-size: 20px;
     touch-action: none;
 }
@@ -84,9 +87,9 @@
     width: 32px;
     min-width: 32px;
     max-width: 32px;
-    height: 32px;
-    min-height: 32px;
-    max-height: 32px;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
     padding: 0;
     margin: 0;
     aspect-ratio: 1;
@@ -95,7 +98,7 @@
 }
 
 .quikinput-sort-placeholder {
-    height: 32px;
+    height: 30px;
     border: 1px dashed var(--SmartThemeBorderColor);
     border-radius: 6px;
     box-sizing: border-box;
