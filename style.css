@@ -42,7 +42,7 @@
 #quikinput-editor {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 7px;
     margin: 0;
     padding: 0;
 }
