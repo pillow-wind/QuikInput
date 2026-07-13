@@ -6,6 +6,21 @@
 
 #quikinput-character {
     width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+.quikinput-character-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.quikinput-character-row label {
+    margin: 0;
+    white-space: nowrap;
 }
 
 .quikinput-toolbar {

@@ -252,8 +252,10 @@ function createSettings() {
                     <label class="checkbox_label"><input id="quikinput-master-enabled" type="checkbox"><span>启用扩展</span></label>
                     <button id="quikinput-add" type="button" class="menu_button">＋ 添加按钮</button>
                 </div>
-                <label for="quikinput-character">选择角色</label>
-                <select id="quikinput-character" class="text_pole"></select>
+                <div class="quikinput-character-row">
+                    <label for="quikinput-character">选择角色</label>
+                    <select id="quikinput-character" class="text_pole"></select>
+                </div>
                 <div id="quikinput-editor"></div>
             </div>
         </div>`;
