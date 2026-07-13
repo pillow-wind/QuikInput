@@ -187,9 +187,8 @@ function renderEditor() {
 
         const remove = document.createElement('button');
         remove.type = 'button';
-        remove.className = 'menu_button quikinput-remove';
+        remove.className = 'menu_button fa-solid fa-trash-can fa-fw quikinput-remove';
         remove.title = '删除';
-        remove.textContent = '×';
 
         row.append(drag, label, value, remove);
         container.append(row);
