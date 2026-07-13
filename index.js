@@ -1,15 +1,14 @@
 const MODULE_NAME = 'quikinput';
 const FIELD_NAME = 'quikinput';
+const QR_SET_NAME = '角色名快捷输入（QuikInput）';
 
-const DEFAULT_SETTINGS = Object.freeze({
-    enabled: true,
-});
+const DEFAULT_SETTINGS = Object.freeze({ enabled: true });
 
 let editorCharacterId = null;
-let barElement = null;
 let settingsElement = null;
-let qrObserver = null;
-let qrRepairScheduled = false;
+let quickReplyApi = null;
+let lastQrSignature = null;
+let qrSyncQueue = Promise.resolve();
 
 function context() {
     return SillyTavern.getContext();
@@ -25,28 +24,18 @@ function getCurrentCharacterId() {
 function getSettings() {
     const { extensionSettings } = context();
     extensionSettings[MODULE_NAME] ??= structuredClone(DEFAULT_SETTINGS);
-    for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-        extensionSettings[MODULE_NAME][key] ??= value;
-    }
+    extensionSettings[MODULE_NAME].enabled ??= DEFAULT_SETTINGS.enabled;
     return extensionSettings[MODULE_NAME];
 }
 
-function emptyCharacterConfig() {
-    return { buttons: [] };
-}
-
 function getCharacterConfig(characterId) {
-    const character = context().characters?.[characterId];
-    const stored = character?.data?.extensions?.[FIELD_NAME];
-    if (!stored || typeof stored !== 'object') return emptyCharacterConfig();
-
+    const stored = context().characters?.[characterId]?.data?.extensions?.[FIELD_NAME];
     return {
-        buttons: Array.isArray(stored.buttons)
-            ? stored.buttons.map((button) => ({
+        buttons: Array.isArray(stored?.buttons)
+            ? stored.buttons.map(button => ({
                 id: String(button.id || crypto.randomUUID()),
                 label: String(button.label || ''),
                 value: String(button.value ?? button.label ?? ''),
-                mode: ['replace', 'append', 'cursor'].includes(button.mode) ? button.mode : 'cursor',
             }))
             : [],
     };
@@ -55,108 +44,88 @@ function getCharacterConfig(characterId) {
 async function saveCharacterConfig(characterId, config) {
     if (!Number.isInteger(characterId) || !context().characters?.[characterId]) return;
     await context().writeExtensionField(characterId, FIELD_NAME, config);
-    renderBar();
+    if (characterId === getCurrentCharacterId()) queueQuickReplySync(true);
 }
 
-function placeText(value, mode) {
+function insertAtCursor(value) {
     const input = document.querySelector('#send_textarea');
     if (!(input instanceof HTMLTextAreaElement)) return;
 
-    if (mode === 'replace') {
-        input.value = value;
-        input.setSelectionRange(value.length, value.length);
-    } else if (mode === 'append') {
-        input.value += value;
-        input.setSelectionRange(input.value.length, input.value.length);
-    } else {
-        const start = input.selectionStart ?? input.value.length;
-        const end = input.selectionEnd ?? start;
-        input.setRangeText(value, start, end, 'end');
-    }
-
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    input.setRangeText(value, start, end, 'end');
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.focus();
 }
 
-function ensureBar() {
-    const nativeBar = document.querySelector('#qr--bar');
-    if (!nativeBar) return null;
-    if (barElement?.isConnected && barElement.parentElement === nativeBar) return barElement;
-
-    barElement?.remove();
-    barElement = document.createElement('div');
-    barElement.id = 'quikinput-buttons';
-    barElement.className = 'qr--buttons quikinput-buttons';
-    barElement.setAttribute('aria-label', '角色名快捷输入');
-    nativeBar.append(barElement);
-    return barElement;
+async function waitForQuickReplyApi() {
+    for (let attempt = 0; attempt < 100; attempt++) {
+        if (globalThis.quickReplyApi) return globalThis.quickReplyApi;
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    console.error('[QuikInput] Quick Reply API 未初始化，请确认内置 Quick Reply 扩展已启用。');
+    return null;
 }
 
-function renderBar() {
-    const bar = ensureBar();
-    if (!bar) return;
-    bar.replaceChildren();
+function queueQuickReplySync(force = false) {
+    qrSyncQueue = qrSyncQueue
+        .then(() => syncQuickReplySet(force))
+        .catch(error => console.error('[QuikInput] 同步 Quick Reply Set 失败：', error));
+    return qrSyncQueue;
+}
+
+async function syncQuickReplySet(force = false) {
+    quickReplyApi ??= await waitForQuickReplyApi();
+    if (!quickReplyApi) return;
 
     const characterId = getCurrentCharacterId();
-    const settings = getSettings();
-    if (!settings.enabled || characterId === null) {
-        bar.remove();
-        barElement = null;
-        return;
-    }
+    const enabled = getSettings().enabled;
+    const buttons = enabled && characterId !== null
+        ? getCharacterConfig(characterId).buttons
+        : [];
+    const signature = JSON.stringify({ enabled, characterId, buttons });
+    if (!force && signature === lastQrSignature) return;
 
-    const config = getCharacterConfig(characterId);
-    if (config.buttons.length === 0) {
-        bar.remove();
-        barElement = null;
-        return;
-    }
-
-    for (const item of config.buttons) {
-        const button = document.createElement('div');
-        button.className = 'qr--button menu_button quikinput-button';
-        button.setAttribute('role', 'button');
-        button.tabIndex = 0;
-        button.textContent = item.label || item.value || '未命名';
-        button.title = item.value;
-        button.addEventListener('click', () => placeText(item.value, item.mode));
-        button.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                placeText(item.value, item.mode);
-            }
+    let set = quickReplyApi.getSetByName(QR_SET_NAME);
+    if (!set) {
+        set = await quickReplyApi.createSet(QR_SET_NAME, {
+            disableSend: true,
+            placeBeforeInput: false,
+            injectInput: false,
         });
-        bar.append(button);
+    } else if (!set.disableSend || set.placeBeforeInput || set.injectInput) {
+        set = await quickReplyApi.updateSet(QR_SET_NAME, {
+            disableSend: true,
+            placeBeforeInput: false,
+            injectInput: false,
+        });
     }
-    bar.hidden = false;
-}
 
-function shouldShowBar() {
-    const characterId = getCurrentCharacterId();
-    return getSettings().enabled
-        && characterId !== null
-        && getCharacterConfig(characterId).buttons.length > 0;
-}
+    for (const qr of [...set.qrList]) {
+        quickReplyApi.deleteQuickReply(QR_SET_NAME, qr.id);
+    }
 
-function observeNativeQrBar() {
-    qrObserver?.disconnect();
-    const sendForm = document.querySelector('#send_form');
-    if (!sendForm) return;
+    for (const item of buttons) {
+        const qr = quickReplyApi.createQuickReply(QR_SET_NAME, item.label || item.value || '未命名', {
+            message: `quikinput:${item.id}`,
+            title: item.value,
+            showLabel: true,
+        });
+        qr.onExecute = async () => {
+            insertAtCursor(item.value);
+            return '';
+        };
+    }
 
-    qrObserver = new MutationObserver(() => {
-        if (!shouldShowBar() || document.querySelector('#quikinput-buttons')) return;
-        if (qrRepairScheduled) return;
+    await set.save();
+    const isActive = quickReplyApi.listGlobalSets().includes(QR_SET_NAME);
+    if (enabled && buttons.length > 0 && !isActive) {
+        quickReplyApi.addGlobalSet(QR_SET_NAME, true);
+    } else if ((!enabled || buttons.length === 0) && isActive) {
+        quickReplyApi.removeGlobalSet(QR_SET_NAME);
+    }
 
-        qrRepairScheduled = true;
-        setTimeout(() => {
-            qrRepairScheduled = false;
-            if (shouldShowBar() && !document.querySelector('#quikinput-buttons')) {
-                barElement = null;
-                renderBar();
-            }
-        }, 0);
-    });
-    qrObserver.observe(sendForm, { childList: true, subtree: true });
+    lastQrSignature = signature;
 }
 
 function makeOption(value, text) {
@@ -210,22 +179,13 @@ function renderEditor() {
         value.placeholder = '填入输入框的内容';
         value.value = item.value;
 
-        const mode = document.createElement('select');
-        mode.className = 'text_pole quikinput-mode';
-        mode.append(
-            makeOption('cursor', '光标处插入'),
-            makeOption('append', '末尾追加'),
-            makeOption('replace', '替换全部'),
-        );
-        mode.value = item.mode;
-
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'menu_button quikinput-remove';
         remove.title = '删除';
         remove.textContent = '×';
 
-        row.append(label, value, mode, remove);
+        row.append(label, value, remove);
         container.append(row);
     });
 }
@@ -238,14 +198,14 @@ async function saveEditorRows() {
         id: oldConfig.buttons[index]?.id || crypto.randomUUID(),
         label: row.querySelector('.quikinput-label').value.trim(),
         value: row.querySelector('.quikinput-value').value,
-        mode: row.querySelector('.quikinput-mode').value,
     }));
-    await saveCharacterConfig(editorCharacterId, { ...oldConfig, buttons });
+    await saveCharacterConfig(editorCharacterId, { buttons });
 }
 
 function createSettings() {
-    if (document.querySelector('#quikinput-settings')) {
-        settingsElement = document.querySelector('#quikinput-settings');
+    const existing = document.querySelector('#quikinput-settings');
+    if (existing) {
+        settingsElement = existing;
         return;
     }
     const host = document.querySelector('#extensions_settings2');
@@ -268,7 +228,7 @@ function createSettings() {
                 <label for="quikinput-character">选择角色</label>
                 <select id="quikinput-character" class="text_pole"></select>
                 <div id="quikinput-editor"></div>
-                <small>配置保存在角色卡的 extensions.quikinput 字段中。群聊暂不显示。</small>
+                <small>每个角色的按钮保存在角色卡中，并同步为一个官方 QR 包；点击按钮时固定在光标处插入。</small>
             </div>
         </div>`;
     host.append(wrapper);
@@ -279,10 +239,10 @@ function createSettings() {
     master.addEventListener('change', () => {
         getSettings().enabled = master.checked;
         context().saveSettingsDebounced();
-        renderBar();
+        queueQuickReplySync(true);
     });
 
-    wrapper.querySelector('#quikinput-character').addEventListener('change', (event) => {
+    wrapper.querySelector('#quikinput-character').addEventListener('change', event => {
         editorCharacterId = event.target.value === '' ? null : Number(event.target.value);
         renderEditor();
     });
@@ -290,13 +250,13 @@ function createSettings() {
     wrapper.querySelector('#quikinput-add').addEventListener('click', async () => {
         if (!Number.isInteger(editorCharacterId)) return;
         const config = getCharacterConfig(editorCharacterId);
-        config.buttons.push({ id: crypto.randomUUID(), label: '新按钮', value: '', mode: 'cursor' });
+        config.buttons.push({ id: crypto.randomUUID(), label: '新按钮', value: '' });
         await saveCharacterConfig(editorCharacterId, config);
         renderEditor();
     });
 
     wrapper.querySelector('#quikinput-editor').addEventListener('change', saveEditorRows);
-    wrapper.querySelector('#quikinput-editor').addEventListener('click', async (event) => {
+    wrapper.querySelector('#quikinput-editor').addEventListener('click', async event => {
         const remove = event.target.closest('.quikinput-remove');
         if (!remove || !Number.isInteger(editorCharacterId)) return;
         const index = Number(remove.closest('.quikinput-editor-row').dataset.index);
@@ -310,16 +270,14 @@ function createSettings() {
 function refreshAll() {
     refreshCharacterSelect();
     renderEditor();
-    renderBar();
-    // Quick Reply 会在切换聊天时自行重绘按钮栏，稍后再补回本扩展按钮。
-    setTimeout(renderBar, 0);
+    queueQuickReplySync(true);
 }
 
-function initialize() {
+async function initialize() {
     getSettings();
     createSettings();
+    quickReplyApi = await waitForQuickReplyApi();
     refreshAll();
-    observeNativeQrBar();
 
     const { eventSource, event_types } = context();
     eventSource.on(event_types.CHAT_CHANGED, refreshAll);
