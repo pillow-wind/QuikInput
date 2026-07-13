@@ -1,0 +1,11 @@
+{
+  "display_name": "角色名快捷输入",
+  "loading_order": 10,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "QuikInput",
+  "version": "0.1.0",
+  "homePage": "https://github.com/pillow-wind/QuikInput"
+}
