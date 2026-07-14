@@ -298,7 +298,7 @@ function createSettings() {
     wrapper.querySelector('#quikinput-add').addEventListener('click', async () => {
         if (!Number.isInteger(editorCharacterId)) return;
         const config = getCharacterConfig(editorCharacterId);
-        config.buttons.push({ id: crypto.randomUUID(), label: '角色名', value: '' });
+        config.buttons.push({ id: crypto.randomUUID(), label: '', value: '' });
         await saveCharacterConfig(editorCharacterId, config);
         renderEditor();
     });
